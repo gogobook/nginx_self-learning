@@ -1,0 +1,31 @@
+version: '3.5'
+
+services:
+
+  app:
+    build: ./app
+    # ports:
+    #   - "8000:8000"
+    volumes:
+      - ./app:/usr/src/app
+      - ./.run/gunicorn:/var/run/gunicorn
+    command: sh -c "gunicorn -w 2 --bind unix:/var/run/gunicorn/gunicorn.sock -k uvicorn.workers.UvicornWorker --log-level info app:app"
+    # command: python app.py
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./app/static:/var/www/app/static:ro        # 這裡把web (也就是django)的static files放在nginx中。
+      - ./app/media:/var/www/app/media          # 同樣的，把media也放在nginx中。
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+
+      - ./.run/gunicorn:/var/run/gunicorn
+      - ./nginx/html:/etc/nginx/html # html 內放置let's encrypt 的驗證碼及google search console 的驗證碼。
+
+    # logging:
+    #   driver: none
+    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
